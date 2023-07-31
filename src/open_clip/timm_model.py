@@ -55,6 +55,8 @@ class TimmModel(nn.Module):
             timm_kwargs['patch_drop_rate'] = patch_drop
 
         custom_pool = pool in ('abs_attn', 'rot_attn')
+        self.pool = pool
+
         if not proj and not custom_pool:
             # use network classifier head as projection if no proj specified and no custom pooling used
             self.trunk = timm.create_model(
@@ -76,6 +78,8 @@ class TimmModel(nn.Module):
             if custom_pool:
                 assert feature_ndim == 2
                 # if attn pooling used, remove both classifier and default pool
+                self.trunk.reset_classifier(0, global_pool='')
+            elif pool == 'skip_pooling':
                 self.trunk.reset_classifier(0, global_pool='')
             else:
                 # reset global pool if pool config set, otherwise leave as network default
@@ -145,5 +149,7 @@ class TimmModel(nn.Module):
 
     def forward(self, x):
         x = self.trunk(x)
+        if self.pool == 'skip_pooling':
+             x = torch.permute(x, (0, 2, 3, 1))
         x = self.head(x)
         return x
